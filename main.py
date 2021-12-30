@@ -1,136 +1,143 @@
+import json
+
 import pymysql
+import requests
+from requests.exceptions import HTTPError
+
 from app import app
 from config import mysql
 from flask import jsonify
 from flask import flash, request
 
-@app.route('/activity_logs', defaults={'page':1})
+
+@app.route('/activity_logs', defaults={'page': 1})
 @app.route('/activity_logs/<int:page>')
 def activity_logs(page):
-	per_page = 100
-	# page = request.args.get(get_page_parameter(), type=int, default=1)
-	offset = (page - 1) * per_page
-	try:
-		conn = mysql.connect()
-		cursor = conn.cursor(pymysql.cursors.DictCursor)
+    per_page = 100
+    try:
+        conn = mysql.connect()
+        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        cursor.execute(
+            "SELECT count(id) as count FROM activity_logs_01")
+        total = cursor.fetchall()
 
-		cursor.execute("SELECT * FROM activity_logs")
-		total = cursor.fetchall()
+        count = total[0]['count']
 
-		cursor.execute("SELECT * FROM activity_logs order by id asc LIMIT %s OFFSET %s", (per_page, offset))
-		activityRows = cursor.fetchall()
+        iterations = (count // per_page) + 2
 
-		response = jsonify({
-			"paginate" : {
-				"page" : page,
-				"per_page": per_page,
-				"offset": offset,
-				"total": len(total)
-			},
-			"data" : activityRows
-		})
-		response.status_code = 200
-		return response
-	except Exception as e:
-		print(e)
-	finally:
-		cursor.close()
-		conn.close()
+        f = open("logs.txt", "w")
+        f.close()
 
-@app.route('/mtn_dumps', defaults={'page':1})
-@app.route('/mtn_dumps/<int:page>')
-def mtn_dumps(page):
-	per_page = 100
-	# page = request.args.get(get_page_parameter(), type=int, default=1)
-	offset = (page - 1) * per_page
-	try:
-		conn = mysql.connect()
-		cursor = conn.cursor(pymysql.cursors.DictCursor)
+        for i in range(1, iterations):
+            page = i
+            offset = (page - 1) * per_page
+            cursor.execute("SELECT * FROM activity_logs_01 order by id asc LIMIT %s OFFSET %s", (per_page, offset))
+            activity_rows = cursor.fetchall()
+            payload = json.dumps(activity_rows, indent=4, sort_keys=True, default=str)
 
-		cursor.execute("SELECT * FROM mtndumps")
-		total = cursor.fetchall()
+            headers = {
+                'Content-Type': 'application/json; charset=utf-8'
+            }
+            try:
+                res = requests.post('http://prodapps.intelligra.io:86/api/v1/activity/batch', data=payload, headers=headers)
+                # res.json()
+                # f = open("logs.txt", "a")
+                # f.write("Record - {} to {} written \n".format(activity_rows[0]['id'], activity_rows[len(activity_rows) - 1]['id']))
+                # f.close()
+            except HTTPError as http_err:
+                print(f'HTTP error occurred: {http_err}')  # Python 3.6
+            except Exception as err:
+                print(f'Other error occurred: {err}')  # Python 3.6
+            else:
+                print('Success!')
 
-		cursor.execute("SELECT * FROM mtndumps order by id asc LIMIT %s OFFSET %s", (per_page, offset))
-		mtnDumpsRows = cursor.fetchall()
+        response = jsonify({
+            "paginate": {
+                "page": page,
+                "per_page": per_page,
+                "offset": offset,
+                "total": len(total)
+            },
+            "data": activity_rows
+        })
+        response.status_code = 200
+        return response
+    except Exception as e:
+        print(e)
+    finally:
+        cursor.close()
+        conn.close()
 
-		response = jsonify({
-			"paginate": {
-				"page": page,
-				"per_page": per_page,
-				"offset": offset,
-				"total": len(total)
-			},
-			"data": mtnDumpsRows
-		})
 
-		response.status_code = 200
-		return response
-	except Exception as e:
-		print(e)
-	finally:
-		cursor.close()
-		conn.close()
+@app.route('/data_dump', defaults={'page': 1})
+@app.route('/data_dump/<int:page>')
+def precustomers(page):
+    per_page = 100
+    try:
+        conn = mysql.connect()
+        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        cursor.execute(
+            "SELECT count(id) as count FROM data_dumps")
+        total = cursor.fetchall()
 
-@app.route('/data_dumps', defaults={'page':1})
-@app.route('/data_dumps/<int:page>')
-def data_dumps(page):
-	per_page = 100
-	# page = request.args.get(get_page_parameter(), type=int, default=1)
-	offset = (page - 1) * per_page
-	try:
-		conn = mysql.connect()
-		cursor = conn.cursor(pymysql.cursors.DictCursor)
+        count = total[0]['count']
 
-		cursor.execute("SELECT * FROM data_dumps")
-		total = cursor.fetchall()
+        iterations = (count // per_page) + 2
 
-		cursor.execute("SELECT * FROM data_dumps order by id asc LIMIT %s OFFSET %s", (per_page, offset))
-		dataDumpsRows = cursor.fetchall()
+        f = open("logs.txt", "w")
+        f.close()
 
-		response = jsonify({
-			"paginate": {
-				"page": page,
-				"per_page": per_page,
-				"offset": offset,
-				"total": len(total)
-			},
-			"data": dataDumpsRows
-		})
+        for i in range(1, iterations):
+            page = i
+            offset = (page - 1) * per_page
+            cursor.execute("SELECT * FROM data_dumps order by id asc LIMIT %s OFFSET %s", (per_page, offset))
+            activity_rows = cursor.fetchall()
+            payload = json.dumps(activity_rows, indent=4, sort_keys=True, default=str)
 
-		response.status_code = 200
-		return response
-	except Exception as e:
-		print(e)
-	finally:
-		cursor.close()
-		conn.close()
+            headers = {
+                'Content-Type': 'application/json; charset=utf-8'
+            }
+            try:
+                res = requests.post('http://prodapps.intelligra.io:86/api/v1/data/batch', data=payload, headers=headers)
+                # res.json()
+                # f = open("logs.txt", "a")
+                # f.write("Record - {} to {} written \n".format(activity_rows[0]['id'], activity_rows[len(activity_rows) - 1]['id']))
+                # f.close()
+            except HTTPError as http_err:
+                print(f'HTTP error occurred: {http_err}')  # Python 3.6
+            except Exception as err:
+                print(f'Other error occurred: {err}')  # Python 3.6
+            else:
+                print('Success!')
 
-@app.route('/precustomers')
-def precustomers():
-	try:
-		conn = mysql.connect()
-		cursor = conn.cursor(pymysql.cursors.DictCursor)
-		cursor.execute("select id as precustomer_id, bvn_dump, id_dump from pre_customers where bvn_dump is not null and id_dump is not null")
-		precustomers = cursor.fetchall()
-		respone = jsonify(precustomers)
-		respone.status_code = 200
-		return respone
-	except Exception as e:
-		print(e)
-	finally:
-		cursor.close()
-		conn.close()
+        response = jsonify({
+            "paginate": {
+                "page": page,
+                "per_page": per_page,
+                "offset": offset,
+                "total": len(total)
+            },
+            "data": activity_rows
+        })
+        response.status_code = 200
+        return response
+    except Exception as e:
+        print(e)
+    finally:
+        cursor.close()
+        conn.close()
+
 
 @app.errorhandler(404)
 def not_found(error=None):
-	message = {
-		'status': 404,
-		'message': 'Record not found: ' + request.url,
-	}
-	respone = jsonify(message)
-	respone.status_code = 404
-	return respone
+    message = {
+        'status': 404,
+        'message': 'Record not found: ' + request.url,
+    }
+    respone = jsonify(message)
+    respone.status_code = 404
+    return respone
 
 
 if __name__ == "__main__":
-	app.run(host='0.0.0.0',port=5032, debug=True)
+    app.run(host='0.0.0.0', port=5032, debug=True)
